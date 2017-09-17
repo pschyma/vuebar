@@ -19,6 +19,7 @@
             - contains default values
         \*------------------------------------*/
         function createState(el){
+            var browser = detectBrowser();
             el._vuebarState = {
 
                 // config with default values that may be overwritten on directive intialization
@@ -48,6 +49,9 @@
                     draggerClass: 'vb-dragger',
                     draggerStylerClass: 'vb-dragger-styler',
                 },
+
+                // browser
+                browser: browser,
 
                 // reference to binding
                 binding: null,
@@ -122,12 +126,12 @@
         \*------------------------------------*/
         function computeVisibleArea(el){
             var state = getState(el);
-            state.visibleArea = (state.el2.clientHeight / state.el2.scrollHeight);
+            state.visibleArea = state.el2.clientHeight / state.el2.scrollHeight;
         }
 
         function computeScrollTop(el){
             var state = getState(el);
-            state.scrollTop = state.barTop * (state.el2.scrollHeight / state.el2.clientHeight);
+            state.scrollTop = Math.round(state.barTop * (state.el2.scrollHeight / state.el2.clientHeight));
         }
 
         function computeBarTop(el, event){
@@ -135,7 +139,7 @@
 
             // if the function gets called on scroll event
             if (!event) {
-                state.barTop = state.el2.scrollTop * state.visibleArea;
+                state.barTop = Math.round(state.el2.scrollTop * state.visibleArea);
                 return false;
             } // else the function gets called when moving dragger with mouse
 
@@ -153,7 +157,7 @@
             if ( (state.barTop + state.barHeight ) >= state.el2.clientHeight ) { // if bar is trying to go over bottom
                 state.barTop = state.el2.clientHeight - state.barHeight;
             }
-
+            state.barTop = Math.round(state.barTop)
         }
 
         function computeBarHeight(el){
@@ -161,7 +165,7 @@
             if (state.visibleArea >= 1) {
                 state.barHeight = 0;
             } else {
-                state.barHeight = state.el2.clientHeight * state.visibleArea;
+                state.barHeight = Math.round(state.el2.clientHeight * state.visibleArea);
             }
         }
 
@@ -197,6 +201,8 @@
         function updateDragger(el, options){
             var options = options ? options : {};
             var state = getState(el);
+
+            state.dragger.style.display = state.draggerEnabled ? 'block' : 'none'
 
             // setting dragger styles
             state.dragger.style.height = parseInt( Math.round( state.barHeight)  ) + 'px';
@@ -332,6 +338,7 @@
             var options = options ? options : {};
 
             if (options.immediate) {
+                applyScrollbar(el);
                 computeVisibleArea(el);
                 computeBarTop(el);
                 computeBarHeight(el);
@@ -340,6 +347,7 @@
 
             Vue.nextTick(function(){
                 if ( !getState(el) ) { return false }
+                applyScrollbar(el);
                 computeVisibleArea(el);
                 computeBarTop(el);
                 computeBarHeight(el);
@@ -463,7 +471,7 @@
             observer.observe(state.el2, {
                 childList: true,
                 characterData: true,
-                subtree: true,
+                subtree: true
             });
 
             return observer;
@@ -500,15 +508,6 @@
                 state.config[key] = options[key];
             }
 
-            // detect browser
-            var browser = detectBrowser();
-
-            // dragger enabled?
-            var elNativeScrollbarWidth = getNativeScrollbarWidth(el.firstElementChild);
-            var overlayScrollbar = elNativeScrollbarWidth == 0;
-            state.draggerEnabled = ( (!overlayScrollbar) || state.config.overrideFloatingScrollbar ) ? 1 : 0;
-
-            // setup scrollbar "state"
             state.binding = kwargs.value ? kwargs : null;
             state.el1 = el;
             state.el2 = el.firstElementChild;
@@ -537,30 +536,7 @@
             state.el2.style.overflowY = 'scroll';
             state.el2.style.height = '100%';
 
-            // do the magic
-            if (state.draggerEnabled) {
-
-                // hide original browser scrollbar using pseudo css selectors (only chrome & safari)
-                if ( state.config.useScrollbarPseudo && (browser.chrome || browser.safari) ) {
-                    state.el2.style.width = '100%';
-                    hideScrollbarUsingPseudoElement(el);
-                }
-
-                // hide original browser overlay scrollbar and add padding to compensate for that
-                else if (overlayScrollbar) {
-                    /* state.el2.style.width = 'calc(100% + ' + 20 + 'px)';
-                    compatStyle(state.el2, 'BoxSizing', 'border-box'); */
-                    state.el2.style.width = '100%';
-                    compatStyle(state.el2, 'BoxSizing', 'content-box');
-                    state.el2.style.paddingRight = '20px';
-                }
-
-                // hide original browser scrollbar behind element edges and hidden overflow
-                else {
-                    state.el2.style.width = 'calc(100% + ' + elNativeScrollbarWidth + 'px)';
-                }
-
-            }
+            applyScrollbar(el)
 
             // add events
             // - wheel event is only needed when preventParentScroll option is enabled
@@ -573,6 +549,43 @@
             // initial calculations using refresh scrollbar
             refreshScrollbar(el, {immediate: true});
 
+        }
+
+
+        function applyScrollbar (el) {
+          var state = getState(el);
+
+          // dragger enabled?
+          var elNativeScrollbarWidth = getNativeScrollbarWidth(el.firstElementChild);
+          var overlayScrollbar = elNativeScrollbarWidth == 0;
+          state.draggerEnabled = ( (!overlayScrollbar) || state.config.overrideFloatingScrollbar ) ? 1 : 0;
+
+          // do the magic
+          if (state.draggerEnabled && state.scrollbarWidth !== elNativeScrollbarWidth) {
+            var browser = state.browser;
+            // hide original browser scrollbar using pseudo css selectors (only chrome & safari)
+            if ( state.config.useScrollbarPseudo && (browser.chrome || browser.safari) ) {
+              state.el2.style.width = '100%';
+              hideScrollbarUsingPseudoElement(el);
+            }
+
+            // hide original browser overlay scrollbar and add padding to compensate for that
+            else if (overlayScrollbar) {
+              /* state.el2.style.width = 'calc(100% + ' + 20 + 'px)';
+              compatStyle(state.el2, 'BoxSizing', 'border-box'); */
+              state.el2.style.width = '100%';
+              compatStyle(state.el2, 'BoxSizing', 'content-box');
+              state.el2.style.paddingRight = '20px';
+            }
+
+            // hide original browser scrollbar behind element edges and hidden overflow
+            else {
+              state.el2.style.width = 'calc(100% + ' + elNativeScrollbarWidth + 'px)';
+            }
+
+          }
+
+          state.scrollbarWidth = elNativeScrollbarWidth
         }
 
 
