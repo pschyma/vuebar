@@ -202,10 +202,10 @@
             var options = options ? options : {};
             var state = getState(el);
 
-            state.dragger.style.display = state.draggerEnabled ? 'block' : 'none'
+            state.dragger.style.display = state.draggerEnabled ? 'block' : 'none';
 
             // setting dragger styles
-            state.dragger.style.height = parseInt( Math.round( state.barHeight)  ) + 'px';
+            state.dragger.style.height = parseInt( Math.round( state.barHeight) ) + 'px';
             state.dragger.style.top = parseInt( Math.round( state.barTop ) ) + 'px';
             //state.dragger.style.height = Math.ceil( state.barHeight ) + 'px';
             //state.dragger.style.top = Math.ceil( state.barTop ) + 'px';
@@ -465,7 +465,24 @@
             var state = getState(el);
 
             var observer = new MutationObserver(throttle(function(mutations) {
-                refreshScrollbar(el);
+                var refresh = false;
+
+                for (var idx = 0; idx < mutations.length; idx++) {
+                    var mutation = mutations[idx];
+
+                    if (mutation.type === 'childList') {
+                        var node = (mutation.addedNodes[0] || mutation.removedNodes[0]);
+                        if (node.className !== 'scrollbar-measure') {
+                             refresh = true;
+                        }
+                    } else {
+                        refresh = true;
+                    }
+
+                }
+
+                if (refresh)
+                    refreshScrollbar(el);
             }, state.config.observerThrottle));
 
             observer.observe(state.el2, {
@@ -850,6 +867,8 @@
 
             var wrapper = document.createElement('div');
             var child = document.createElement('div');
+
+            wrapper.className = 'scrollbar-measure';
 
             wrapper.style.position = 'absolute';
             wrapper.style.pointerEvents = 'none';
